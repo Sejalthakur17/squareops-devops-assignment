@@ -225,25 +225,31 @@ kubectl get ingress
 
 ---
 
-# Access Application
+# Testing the Application
 
-Vote Application
-
-```
-http://localhost:8088
-```
-
-Result Application
-
-```
-http://localhost:8088/result
-```
-
-Port Forward
+Start port forwarding for the Vote service:
 
 ```bash
-kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8088:80
+kubectl port-forward service/vote 8080:8080
 ```
+
+Open a new terminal and start port forwarding for the Result service:
+
+```bash
+kubectl port-forward service/result 8081:8081
+```
+
+Open your browser:
+
+### Vote Application
+
+http://localhost:8080
+
+### Result Application
+
+http://localhost:8081
+
+Cast a vote in the Vote application. The Result application will automatically update to display the latest voting results.
 
 ---
 

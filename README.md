@@ -404,7 +404,7 @@ kubectl port-forward service/result 8081:8081
 
 Loom Recording:
 
-(Add Loom Link Here)
+https://www.loom.com/share/ad339e1e59404f85b655c58d5fc6bd54
 
 ---
 

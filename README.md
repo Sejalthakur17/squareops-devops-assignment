@@ -2,78 +2,129 @@
 
 ## Overview
 
-This repository contains the deployment of the Example Voting Application using Kubernetes. The project demonstrates container orchestration, Kubernetes resources, NGINX Ingress, secrets management, and CI/CD using GitHub Actions with Docker Hub.
+This repository contains my solution for the **SquareOps DevOps Take-Home Assignment**.
+
+The project deploys the **Docker Example Voting Application** on Kubernetes and demonstrates Kubernetes best practices including StatefulSets, Secrets, Persistent Storage, resource management, health probes, and CI/CD using GitHub Actions.
 
 ---
 
-## Project Architecture
+# Architecture
 
 ```
-                User
-                  │
-                  ▼
-          NGINX Ingress Controller
-                  │
-      ┌───────────┴────────────┐
-      │                        │
-      ▼                        ▼
- Vote Service              Result Service
-      │                        │
-      ▼                        ▼
- Vote Pod                 Result Pod
-      │                        ▲
-      │                        │
-      ▼                        │
- Redis Service ─── Worker Pod ─┘
-                    │
-                    ▼
-             PostgreSQL Service
-                    │
-                    ▼
-             PostgreSQL StatefulSet
+                 User
+                   │
+                   ▼
+          Vote Application (Flask)
+                   │
+                   ▼
+                Redis Queue
+                   │
+                   ▼
+               Worker Service
+                   │
+                   ▼
+        PostgreSQL StatefulSet
+                   │
+                   ▼
+          Result Application
 ```
 
 ---
 
-## Tech Stack
+# Tech Stack
 
 - Kubernetes
 - Docker
 - Docker Hub
 - GitHub Actions
-- NGINX Ingress Controller
+- Kind
 - Redis
 - PostgreSQL
 - YAML
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```
 .
-├── .github
-│   └── workflows
+├── .github/
+│   └── workflows/
 │       └── ci-cd.yml
 │
-├── k8s-specifications
+├── k8s-specifications/
+│   ├── db-statefulset.yaml
+│   ├── db-service.yaml
+│   ├── redis-deployment.yaml
+│   ├── redis-service.yaml
 │   ├── vote-deployment.yaml
 │   ├── vote-service.yaml
 │   ├── result-deployment.yaml
 │   ├── result-service.yaml
 │   ├── worker-deployment.yaml
-│   ├── redis-deployment.yaml
-│   ├── redis-service.yaml
-│   ├── db-statefulset.yaml
-│   ├── db-service.yaml
 │   ├── secret.yaml
 │   └── ingress.yaml
 │
-├── vote
-├── result
-├── worker
+├── vote/
+├── result/
+├── worker/
+├── bootstrap.sh
 └── README.md
 ```
+
+---
+
+# Improvements Made
+
+The original Kubernetes manifests were enhanced with the following improvements:
+
+### Kubernetes Secret
+
+- PostgreSQL credentials were moved into a Kubernetes Secret.
+- Avoids storing sensitive credentials in plain text.
+
+---
+
+### PostgreSQL StatefulSet
+
+- Converted PostgreSQL Deployment to StatefulSet.
+- Added Persistent Volume Claim.
+- Ensures data persistence across pod restarts.
+
+---
+
+### Resource Requests & Limits
+
+Added CPU and Memory requests/limits for application containers.
+
+Benefits:
+
+- Better scheduling
+- Prevents excessive resource consumption
+
+---
+
+### Liveness & Readiness Probes
+
+Configured health checks for application containers.
+
+Benefits:
+
+- Automatic recovery
+- Better availability
+- Reliable rolling updates
+
+---
+
+### GitHub Actions CI/CD
+
+Implemented GitHub Actions workflow to:
+
+- Build Docker Images
+- Push images to Docker Hub
+- Validate Kubernetes manifests
+- Deploy to Kind Cluster
+- Run smoke tests
 
 ---
 
@@ -103,55 +154,52 @@ This repository contains the deployment of the Example Voting Application using 
 postgres-secret
 ```
 
-Stores:
+Contains:
 
 - POSTGRES_USER
 - POSTGRES_PASSWORD
 
 ---
 
-# CI/CD Pipeline
+# Prerequisites
 
-GitHub Actions automatically:
+Install:
 
-- Builds Vote image
-- Builds Result image
-- Builds Worker image
-- Pushes images to Docker Hub
+- Docker Desktop
+- kubectl
+- Kind
+- Git
 
-Workflow file:
+Verify installation:
 
-```
-.github/workflows/ci-cd.yml
+```bash
+docker --version
+kubectl version --client
+kind version
+git --version
 ```
 
 ---
 
-# Docker Images
+# Deployment
 
-Docker Hub Repository:
-
-```
-https://hub.docker.com/r/sejalthakur/vote-app
-```
-
-Images:
-
-- vote-latest
-- result-latest
-- worker-latest
-
----
-
-# Deployment Steps
-
-## Clone Repository
+Clone Repository
 
 ```bash
 git clone https://github.com/Sejalthakur17/squareops-devops-assignment.git
 
 cd squareops-devops-assignment
 ```
+
+---
+
+## One Command Deployment
+
+```bash
+./bootstrap.sh
+```
+
+Or deploy manually.
 
 ---
 
@@ -205,19 +253,31 @@ kubectl apply -f k8s-specifications/ingress.yaml
 
 # Verify Deployment
 
-Check Pods
+Pods
 
 ```bash
 kubectl get pods
 ```
 
-Check Services
+Services
 
 ```bash
 kubectl get svc
 ```
 
-Check Ingress
+Secrets
+
+```bash
+kubectl get secret
+```
+
+Persistent Volume Claims
+
+```bash
+kubectl get pvc
+```
+
+Ingress
 
 ```bash
 kubectl get ingress
@@ -227,49 +287,153 @@ kubectl get ingress
 
 # Testing the Application
 
-Start port forwarding for the Vote service:
+Run:
 
 ```bash
 kubectl port-forward service/vote 8080:8080
 ```
 
-Open a new terminal and start port forwarding for the Result service:
+Open another terminal.
+
+Run:
 
 ```bash
 kubectl port-forward service/result 8081:8081
 ```
 
-Open your browser:
+Open browser:
 
-### Vote Application
+Vote Application
 
+```
 http://localhost:8080
+```
 
-### Result Application
+Result Application
 
+```
 http://localhost:8081
+```
 
-Cast a vote in the Vote application. The Result application will automatically update to display the latest voting results.
+Cast a vote and verify the Result application updates automatically.
 
 ---
 
-# CI/CD Result
+# CI/CD
 
-GitHub Actions completed successfully:
+The GitHub Actions workflow automatically:
 
-- Vote Image Built
-- Result Image Built
-- Worker Image Built
-- Docker Images Published
+- Validates Kubernetes manifests
+- Builds Docker images
+- Pushes images to Docker Hub
+- Creates a Kind cluster
+- Deploys the application
+- Runs smoke tests
+
+Workflow:
+
+```
+.github/workflows/ci-cd.yml
+```
+
+---
+
+# Docker Images
+
+Docker Hub
+
+https://hub.docker.com/r/sejalthakur/vote-app
+
+Published Images
+
+- vote-latest
+- result-latest
+- worker-latest
+
+---
+
+# Troubleshooting
+
+## Pods Not Running
+
+```bash
+kubectl describe pod <pod-name>
+
+kubectl logs <pod-name>
+```
+
+---
+
+## Worker Not Updating Results
+
+Verify:
+
+```bash
+kubectl get pods
+```
+
+Ensure:
+
+- Redis is Running
+- Worker is Running
+- PostgreSQL is Running
+
+---
+
+## Port Forward Not Working
+
+Restart:
+
+```bash
+kubectl port-forward service/vote 8080:8080
+
+kubectl port-forward service/result 8081:8081
+```
+
+---
+
+# Trade-offs
+
+- Used GitHub Actions for CI/CD because of its seamless GitHub integration.
+- Used Kubernetes Service Port Forwarding for local verification.
+- Used StatefulSet only for PostgreSQL since persistent storage is required.
+
+---
+
+# Loom Video
+
+Loom Recording:
+
+(Add Loom Link Here)
+
+---
+
+# Screenshots
+
+Include:
+
+- GitHub Repository
+- Kubernetes Pods
+- Kubernetes Services
+- Kubernetes Secrets
+- Persistent Volume Claims
+- Vote Application
+- Result Application
+- GitHub Actions Success
+- Docker Hub Images
 
 ---
 
 # Author
 
-**Sejal Thakur**
+## Sejal Thakur
 
-GitHub:
+GitHub
+
 https://github.com/Sejalthakur17
 
-Docker Hub:
+Docker Hub
+
 https://hub.docker.com/u/sejalthakur
+
+---

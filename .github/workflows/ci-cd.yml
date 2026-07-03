@@ -1,18 +1,19 @@
-name: Build and Push Docker Images
+name: Vote Service CI/CD
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "vote/**"
+      - "k8s-specifications/**"
+      - ".github/workflows/ci-cd.yml"
+
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  vote-ci:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        service: [vote, result, worker]
 
     steps:
       - name: Checkout Repository
@@ -27,11 +28,47 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push Image
+      # ---------- Lint Kubernetes YAML ----------
+      - name: Install kubeconform
+        run: |
+          curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+          | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate Kubernetes manifests
+        run: |
+          kubeconform -summary k8s-specifications/*.yaml
+
+      # ---------- Build Docker image ----------
+      - name: Build Docker Image
         uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.service }}
+          context: ./vote
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/vote-app:${{ matrix.service }}-latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/vote-app:${{ github.sha }}-${{ matrix.service }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/vote-app:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/vote-app:${{ github.sha }}
+
+      # ---------- Create Kind Cluster ----------
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1
+
+      # ---------- Deploy ----------
+      - name: Deploy Kubernetes Resources
+        run: |
+          kubectl apply -f k8s-specifications/
+
+      # ---------- Wait ----------
+      - name: Wait for Pods
+        run: |
+          kubectl wait --for=condition=Ready pods --all --timeout=300s
+
+      # ---------- Smoke Test ----------
+      - name: Port Forward Vote Service
+        run: |
+          kubectl port-forward service/vote 8080:8080 &
+          sleep 15
+
+      - name: Smoke Test
+        run: |
+          curl --fail http://localhost:8080
